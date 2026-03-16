@@ -1,17 +1,20 @@
-# CN_group_project
-
-
 # Secure Multiplayer Leaderboard System
 
-**Socket Programming Mini Project**
+Socket Programming Mini Project
 
 ## Overview
 
 This project implements a **secure client–server leaderboard system** using low-level socket programming.
-Multiple clients connect to a server and update player scores concurrently.
-The server maintains a shared leaderboard and responds to client requests in real time.
 
-The system demonstrates key networking concepts including **TCP communication, TLS encryption, concurrency handling, protocol design, and performance testing with multiple clients**.
+Multiple clients connect to a server simultaneously and update player scores. The server maintains a shared leaderboard and responds to client requests in real time.
+
+The project demonstrates core networking concepts including:
+
+* TCP socket communication
+* TLS encrypted communication
+* Concurrent client handling
+* Custom protocol design
+* Performance evaluation under load
 
 ---
 
@@ -20,7 +23,7 @@ The system demonstrates key networking concepts including **TCP communication, T
 The project follows a **Client–Server Architecture**.
 
 * The **server** listens for incoming TLS-secured TCP connections.
-* Each client connection is handled in a **separate thread** to support concurrency.
+* Each client connection is handled in a **separate thread**.
 * Clients send commands to update scores or retrieve the leaderboard.
 * A shared leaderboard is maintained with **thread-safe access using locks**.
 
@@ -43,23 +46,24 @@ The project follows a **Client–Server Architecture**.
 # Features
 
 * TCP socket communication
-* TLS-encrypted client–server communication
+* TLS encrypted client-server communication
 * Multi-client concurrency using threads
-* Thread-safe shared leaderboard using locks
+* Thread-safe leaderboard using locks
 * Client simulation for stress testing
 * Real-time leaderboard retrieval
-* Error handling for invalid commands
+* Performance measurement (latency & throughput)
+* Error handling for invalid commands and disconnections
 * Modular project structure
 
 ---
 
 # Technologies Used
 
-* **Python**
-* **TCP Socket Programming**
-* **TLS / SSL Encryption**
-* **Multithreading**
-* **Multiprocessing**
+* Python
+* TCP Socket Programming
+* TLS / SSL Encryption
+* Multithreading
+* Multiprocessing
 
 ---
 
@@ -69,8 +73,8 @@ The project follows a **Client–Server Architecture**.
 SocketProg/
 │
 ├── server.py          # TLS-enabled multi-client server
-├── client.py          # Client program that sends score updates
-├── test_clients.py    # Stress test script to simulate many clients
+├── client.py          # Client program sending score updates
+├── test_clients.py    # Stress testing script
 ├── leaderboard.py     # Thread-safe leaderboard logic
 ├── cert.pem           # TLS certificate
 ├── key.pem            # TLS private key
@@ -81,9 +85,9 @@ SocketProg/
 
 # Communication Protocol
 
-Clients communicate with the server using simple text commands.
+The system uses a **simple text-based custom protocol**.
 
-### Update Player Score
+## 1. Update Score
 
 ```
 UPDATE <player_name> <score>
@@ -95,31 +99,59 @@ Example:
 UPDATE Alice 10
 ```
 
-This increases Alice's score by 10.
+This increases the player's score cumulatively.
+
+Example internal leaderboard update:
+
+```
+Alice: 25
+Bob: 15
+```
 
 ---
 
-### Get Leaderboard
+## 2. Retrieve Leaderboard
 
 ```
 GET
 ```
 
-Example response:
+Example server response:
 
 ```
-Alice: 25
+Alice: 35
 Bob: 20
 Charlie: 15
 ```
 
-Leaderboard is sorted in **descending order of score**.
+Leaderboard results are sorted in **descending score order**.
+
+---
+
+# TLS Certificate Setup
+
+Before running the server, TLS certificates must be generated.
+
+Run the following command:
+
+```
+openssl req -new -x509 -days 365 -nodes -out cert.pem -keyout key.pem
+```
+
+This generates:
+
+```
+cert.pem
+key.pem
+```
+
+These files enable **TLS encrypted communication between clients and the server**.
 
 ---
 
 # How to Run the Project
 
-## 1. Navigate to Project Folder
+## 1. Navigate to the Project Folder
 
 ```
 cd SocketProg
@@ -127,13 +159,11 @@ cd SocketProg
 
 ---
 
-## 2. Generate TLS Certificate (first time only)
+## 2. Generate TLS Certificates (first time only)
 
 ```
 openssl req -new -x509 -days 365 -nodes -out cert.pem -keyout key.pem
 ```
-
-This generates the TLS certificate used by the server.
 
 ---
 
@@ -149,7 +179,7 @@ Expected output:
 [SERVER STARTED] 127.0.0.1:5000
 ```
 
-The server now waits for incoming client connections.
+The server will now listen for client connections.
 
 ---
 
@@ -169,16 +199,16 @@ Server: Score updated
 Server: Score updated
 
 Leaderboard:
-Alice: 20
-Bob: 15
-Charlie: 10
+Palash: 15
+Prajna: 10
+Shristi: 8
 ```
 
 ---
 
 ## 5. Run Stress Test (Multiple Clients)
 
-To simulate multiple concurrent users:
+To simulate concurrent users:
 
 ```
 python test_clients.py
@@ -188,33 +218,74 @@ Example:
 
 ```
 Number of clients: 20
-Starting Client 0
-Starting Client 1
-Starting Client 2
 ```
 
-This launches multiple clients simultaneously to test system scalability.
+This launches multiple clients simultaneously sending update requests.
 
 ---
 
 # Performance Evaluation
 
-The system can be tested under different loads by increasing the number of simulated clients.
+The system performance was evaluated using the `test_clients.py` script.
 
-Example tests:
+Metrics measured:
 
-| Clients | Observation                 |
-| ------- | --------------------------- |
-| 1       | Instant response            |
-| 10      | Minor latency               |
-| 50      | Higher CPU usage but stable |
+* Average response latency
+* Total execution time
+* Throughput (requests per second)
 
-Metrics considered:
+Example output:
 
-* Response time
-* Throughput
-* Server stability
-* Concurrent client handling
+```
+Performance Results
+-------------------
+Total Clients: 20
+Total Requests: 100
+Total Time: 2.35 seconds
+Average Latency: 0.019 seconds
+Throughput: 42.55 requests/second
+```
+
+### Observations
+
+* The server successfully handled multiple concurrent connections.
+* Thread-based concurrency enabled parallel request processing.
+* TLS encryption introduced minimal latency overhead.
+* The system remained stable under high client load.
+
+---
+
+# Fault Tolerance and Error Handling
+
+The system includes several mechanisms to ensure robustness.
+
+### Abrupt Client Disconnections
+
+If a client disconnects unexpectedly, the server detects the closed socket and logs the event.
+
+Example:
+
+```
+[DISCONNECTED] ('127.0.0.1', 53421)
+```
+
+### SSL/TLS Handshake Failures
+
+Invalid TLS clients are rejected safely.
+
+Example:
+
+```
+[SSL ERROR] Handshake failed from ('127.0.0.1', 53421)
+```
+
+### Invalid Commands
+
+If a client sends an unsupported command, the server responds with:
+
+```
+Invalid command
+```
 
 ---
 
@@ -225,7 +296,8 @@ Metrics considered:
 * Concurrent client handling using threads
 * Synchronization using locks
 * Client-server architecture
-* Stress testing with multiple processes
+* Stress testing using multiprocessing
+* Performance evaluation
 
 ---
 
@@ -233,12 +305,16 @@ Metrics considered:
 
 Possible extensions include:
 
-* Persistent storage using a database
-* Web interface for leaderboard display
-* Authentication for clients
-* Distributed leaderboard servers
-* Advanced performance monitoring
+* Database-backed persistent leaderboard
+* Web interface for viewing leaderboard
+* Client authentication system
+* Distributed server architecture
+* Advanced monitoring and logging
 
+---
 
+# Project Context
 
+Computer Networks Lab
 Socket Programming Mini Project
+PES University
