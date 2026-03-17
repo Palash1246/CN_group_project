@@ -154,7 +154,7 @@ These files enable **TLS encrypted communication between clients and the server*
 ## 1. Navigate to the Project Folder
 
 ```
-cd SocketProg
+cd [name of the folder which contains all the codes]
 ```
 
 ---
@@ -191,7 +191,7 @@ Open another terminal and run:
 python client.py
 ```
 
-Example output:
+You should see something like:
 
 ```
 Connected to server
