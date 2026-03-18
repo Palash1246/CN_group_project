@@ -7,7 +7,7 @@ import random
 HOST = "127.0.0.1"
 PORT = 5000
 
-players = ["Alice", "Bob", "Charlie", "David", "Eva"]
+players = ["Palash", "Prajna", "Shristi", "Ojas", "Ojas2"]
 REQUESTS_PER_CLIENT = 5
 
 
