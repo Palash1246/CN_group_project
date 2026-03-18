@@ -3,7 +3,7 @@ import random
 import time
 import ssl
 
-HOST = '127.0.0.1'
+HOST = '10.30.201.35'
 PORT = 5000
 
 players = ["Palash", "Prajna", "Shristi", "Ojas", "Ojas2"]

@@ -3,7 +3,7 @@ import threading
 import ssl
 from leaderboard import update_score, get_leaderboard
 
-HOST = '127.0.0.1'
+HOST = '0.0.0.0'
 PORT = 5000
 
 
