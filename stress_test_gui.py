@@ -23,6 +23,8 @@ import queue
 PLAYERS = ["Palash", "Prajna", "Shristi", "Ojas", "Ojas2",
            "Alex",   "Maria",  "Chen",    "Riya", "Sam"]
 
+MAX_CLIENTS = 50        # breaking point – cannot exceed 50 concurrent clients
+
 BG        = "#0f1117"
 PANEL_BG  = "#1a1d27"
 ACCENT    = "#4f8ef7"
@@ -52,6 +54,15 @@ def _run_client_worker(client_id: int, host: str, port: int,
 
         # name handshake
         prompt = sock.recv(1024).decode().strip()
+
+        # ── breaking point: server rejected us (at 50-client cap) ────────
+        if prompt.startswith("SERVER_FULL"):
+            result_q.append({"error": "SERVER_FULL – server at max capacity (50)",
+                             "client_id": client_id, "latencies": []})
+            sock.close()
+            return
+        # ─────────────────────────────────────────────────────────────────
+
         if prompt == "NAME?":
             sock.send(f"StressClient-{client_id}\n".encode())
 
@@ -65,10 +76,10 @@ def _run_client_worker(client_id: int, host: str, port: int,
 
         sock.close()
     except Exception as e:
-        result_q.put({"error": str(e), "client_id": client_id, "latencies": []})
+        result_q.append({"error": str(e), "client_id": client_id, "latencies": []})
         return
 
-    result_q.put({"client_id": client_id, "latencies": latencies, "error": None})
+    result_q.append({"client_id": client_id, "latencies": latencies, "error": None})
 
 
 # ── GUI ───────────────────────────────────────────────────────────────────────
@@ -154,11 +165,11 @@ class StressTestGUI(tk.Tk):
                                                padx=(8, 0), pady=2)
         inner.columnconfigure(1, weight=1)
 
-        # client slider
+        # client slider — capped at MAX_CLIENTS
         self._lbl(inner, "Clients (slider)").grid(
             row=4, column=0, columnspan=2, sticky="w", pady=(10, 2))
         self._client_slider = tk.Scale(
-            inner, from_=1, to=100, orient="horizontal",
+            inner, from_=1, to=MAX_CLIENTS, orient="horizontal",
             variable=self._cfg["n_clients"],
             bg=PANEL_BG, fg=TEXT, troughcolor="#252838",
             highlightthickness=0, font=FONT_BODY)
@@ -241,9 +252,14 @@ class StressTestGUI(tk.Tk):
         self._log_box.tag_config("error", foreground=RED)
         self._log_box.tag_config("time",  foreground=MUTED)
         tk.Button(inner, text="Clear", font=FONT_BODY,
-                  bg="#2e3248", fg=TEXT, relief="flat", pady=2,
-                  command=self._clear_log, cursor="hand2").pack(
-            anchor="e", pady=(2, 0))
+          bg="#2e3248",
+          fg="#0f1117",
+          disabledforeground="#0f1117",
+          relief="flat",
+          pady=2,
+          command=self._clear_log,
+          cursor="hand2").pack(
+    anchor="e", pady=(2, 0))
 
     # ── test logic ────────────────────────────────────────────────────────────
     def _start_test(self):
@@ -256,6 +272,16 @@ class StressTestGUI(tk.Tk):
             messagebox.showerror("Config Error", "Port, Clients, and Requests must be integers.")
             return
 
+        # ── breaking point: hard cap at MAX_CLIENTS ───────────────────────
+        if n_cl > MAX_CLIENTS:
+            messagebox.showwarning(
+                "Client Limit",
+                f"Maximum allowed clients is {MAX_CLIENTS}.\n"
+                f"Capping {n_cl} → {MAX_CLIENTS}.")
+            n_cl = MAX_CLIENTS
+            self._cfg["n_clients"].set(str(MAX_CLIENTS))
+        # ─────────────────────────────────────────────────────────────────
+
         self._running = True
         self._all_latencies = []
         self._start_btn.config(state="disabled")
@@ -264,7 +290,7 @@ class StressTestGUI(tk.Tk):
         self._stat_done.config(text="0")
         self._stat_err.config(text="0")
         self._stat_time.config(text="0s")
-        self._log(f"Starting {n_cl} clients × {n_req} requests → {host}:{port}", "info")
+        self._log(f"Starting {n_cl} clients × {n_req} requests → {host}:{port}  (limit: {MAX_CLIENTS})", "info")
 
         threading.Thread(target=self._run_test,
                          args=(host, port, n_cl, n_req), daemon=True).start()
@@ -276,13 +302,15 @@ class StressTestGUI(tk.Tk):
         self._stop_btn.config(state="disabled")
 
     def _run_test(self, host, port, n_cl, n_req):
-        manager   = multiprocessing.Manager()
-        mp_results = manager.list()
+        manager    = multiprocessing.Manager()
+        mp_results = manager.list()   # workers call .append(), not .put()
         processes  = []
         t0         = time.time()
+        seen       = 0   # index of next unprocessed result
         done       = 0
         errors     = 0
 
+        # spawn all clients
         for i in range(n_cl):
             if not self._running:
                 break
@@ -293,20 +321,18 @@ class StressTestGUI(tk.Tk):
             p.start()
             processes.append(p)
 
+        # join one-by-one; drain ALL newly appended results after each join
         for p in processes:
             if not self._running:
                 break
             p.join()
-            # drain available results
-            while True:
-                # poll mp_results new items
-                try:
-                    res = mp_results[done + errors]
-                except IndexError:
-                    break
+            while seen < len(mp_results):
+                res = mp_results[seen]
+                seen += 1
                 if res.get("error"):
                     errors += 1
-                    self._log(f"Client {res['client_id']} error: {res['error']}", "error")
+                    self._log(
+                        f"Client {res['client_id']} error: {res['error']}", "error")
                 else:
                     done += 1
                     self._all_latencies.extend(res["latencies"])

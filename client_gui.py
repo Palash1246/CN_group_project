@@ -105,11 +105,18 @@ class ClientGUI(tk.Tk):
         kw.setdefault("relief", "flat")
         return tk.Entry(parent, textvariable=var, **kw)
 
-    def _btn(self, parent, text, cmd, color=ACCENT, fg="#fff", **kw):
-        return tk.Button(parent, text=text, font=FONT_BOLD,
-                         bg=color, fg=fg, relief="flat",
-                         padx=8, pady=5, command=cmd,
-                         cursor="hand2", **kw)
+    def _btn(self, parent, text, cmd, color=ACCENT, fg="black", **kw):
+     return tk.Button(parent,
+                     text=text,
+                     font=FONT_BOLD,
+                     bg=color,
+                     fg="black",
+                     relief="flat",
+                     padx=8,
+                     pady=5,
+                     command=cmd,
+                     cursor="hand2",
+                     **kw)
 
     # ── left panel: connection + mode ─────────────────────────────────────────
     def _build_left(self, parent):
@@ -272,8 +279,13 @@ class ClientGUI(tk.Tk):
         self._log_box.tag_config("time",    foreground=MUTED)
 
         tk.Button(log_tab, text="Clear", font=FONT_BODY,
-                  bg="#2e3248", fg=TEXT, relief="flat", pady=2,
-                  command=self._clear_log, cursor="hand2").pack(
+          bg="#2e3248",
+          fg="black",
+          disabledforeground="black",
+          relief="flat",
+          pady=2,
+          command=self._clear_log,
+          cursor="hand2").pack(
             anchor="e", padx=4, pady=2)
 
         # -- Leaderboard tab --
@@ -340,6 +352,22 @@ class ClientGUI(tk.Tk):
                 self._log("[SSL CONNECTED] Secure connection established", "system")
 
                 prompt = self._sock.recv(1024).decode().strip()
+
+                # ── breaking point: server at 50-client capacity ──────────
+                if prompt.startswith("SERVER_FULL"):
+                    limit = prompt.split("=")[-1] if "=" in prompt else "50"
+                    self._log(
+                        f"[REJECTED] Server full (max {limit} clients). Try again later.",
+                        "error")
+                    self._sock.close()
+                    self._sock = None
+                    self.after(0, lambda: messagebox.showerror(
+                        "Server Full",
+                        f"Server has reached its limit of {limit} clients.\n"
+                        "Please try again later."))
+                    return
+                # ─────────────────────────────────────────────────────────
+
                 if prompt == "NAME?":
                     self._sock.send((name + "\n").encode())
                     self._log(f"[REGISTERED] Connected as '{name}'", "system")

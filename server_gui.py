@@ -23,6 +23,8 @@ _lb_lock = _threading.Lock()
 _connected_clients: dict[str, str] = {}   # addr_str -> client_name
 _clients_lock = _threading.Lock()
 
+MAX_CLIENTS = 50       # breaking point – server refuses connections beyond this
+
 
 def update_score(player: str, score: int) -> int:
     with _lb_lock:
@@ -146,9 +148,14 @@ class ServerGUI(tk.Tk):
         self._stop_btn.pack(side="left", fill="x", expand=True)
 
         tk.Button(inner, text="🗑  Reset Leaderboard", font=FONT_BODY,
-                  bg="#2e3248", fg=TEXT, relief="flat", pady=4,
-                  command=self._reset_board, cursor="hand2").grid(
-            row=3, column=0, columnspan=2, sticky="ew", pady=(2, 10))
+          bg="#2e3248",
+          fg="black",
+          disabledforeground="black",
+          relief="flat",
+          pady=4,
+          command=self._reset_board,
+          cursor="hand2").grid(
+    row=3, column=0, columnspan=2, sticky="ew", pady=(2, 10))
 
         ttk.Separator(inner, orient="horizontal").grid(
             row=4, column=0, columnspan=2, sticky="ew", pady=4)
@@ -236,9 +243,14 @@ class ServerGUI(tk.Tk):
         self._log_box.tag_config("time",    foreground=MUTED)
 
         tk.Button(inner, text="Clear Log", font=FONT_BODY,
-                  bg="#2e3248", fg=TEXT, relief="flat", pady=2,
-                  command=self._clear_log, cursor="hand2").pack(
-            anchor="e", pady=(4, 0))
+          bg="#2e3248",
+          fg="black",
+          disabledforeground="black",
+          relief="flat",
+          pady=2,
+          command=self._clear_log,
+          cursor="hand2").pack(
+    anchor="e", pady=(4, 0))
 
     # ── server logic ──────────────────────────────────────────────────────────
     def _start_server(self):
@@ -268,7 +280,7 @@ class ServerGUI(tk.Tk):
         self._stop_btn.config(state="normal")
         self._status_dot.config(fg=GREEN)
         self._status_lbl.config(fg=GREEN, text="Online")
-        self._log(f"Server started on {host}:{port}", "info")
+        self._log(f"Server started on {host}:{port}  (max clients: {MAX_CLIENTS})", "info")
 
         threading.Thread(target=self._accept_loop, daemon=True).start()
 
@@ -309,6 +321,21 @@ class ServerGUI(tk.Tk):
                 self._log(f"[SSL ERROR] {addr}: {e}", "error")
                 conn.close()
                 continue
+
+            # ── breaking point: reject if at MAX_CLIENTS capacity ─────────
+            with _clients_lock:
+                current = len(_connected_clients)
+            if current >= MAX_CLIENTS:
+                self._log(
+                    f"[LIMIT REACHED] Rejecting {addr} — at capacity ({MAX_CLIENTS})",
+                    "error")
+                try:
+                    conn.send(f"SERVER_FULL max={MAX_CLIENTS}\n".encode())
+                except Exception:
+                    pass
+                conn.close()
+                continue
+            # ─────────────────────────────────────────────────────────────
 
             threading.Thread(target=self._handle_client,
                              args=(conn, addr), daemon=True).start()
