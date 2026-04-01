@@ -17,11 +17,33 @@ def run_client():
         client = context.wrap_socket(sock, server_hostname=HOST)
 
         client.connect((HOST, PORT))
-        print("Connected to server")
+        print("[SSL CONNECTED] Secure connection established with server")
 
-        # Manual input loop
+        # ------------------------------------------------------------------ #
+        #  Name registration handshake                                        #
+        # ------------------------------------------------------------------ #
+        prompt = client.recv(1024).decode().strip()   # receives "NAME?" or "SERVER_FULL"
+
+        # ── breaking point: server at capacity ────────────────────────────
+        if prompt.startswith("SERVER_FULL"):
+            limit = prompt.split("=")[-1] if "=" in prompt else "50"
+            print(f"[REJECTED] Server is full (max {limit} clients). Try again later.")
+            client.close()
+            return
+        # ─────────────────────────────────────────────────────────────────
+
+        if prompt == "NAME?":
+            client_name = input("Enter your client name: ").strip()
+            if not client_name:
+                client_name = "ManualClient"
+            client.send((client_name + "\n").encode())
+            print(f"[REGISTERED] Connected as '{client_name}'")
+
+        # ------------------------------------------------------------------ #
+        #  Manual command loop                                                #
+        # ------------------------------------------------------------------ #
         while True:
-            msg = input("Enter command (UPDATE name score / GET / exit): ")
+            msg = input("\nEnter command (UPDATE <name> <score> / GET / exit): ").strip()
 
             if msg.lower() == "exit":
                 break
@@ -33,6 +55,7 @@ def run_client():
 
         # Close connection after exiting loop
         client.close()
+        print("[DISCONNECTED] Connection closed.")
 
     except Exception as e:
         print("Client error:", e)
